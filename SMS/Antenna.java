@@ -65,6 +65,8 @@ public class Antenna {
     }
 
     private void startAntenna() throws Exception {
+
+        // Rule 3: Receiving and delivering an SMS
         DeliverCallback smsCallback = (consumerTag, delivery) -> {
             String message = new String(delivery.getBody(), "UTF-8");
             String routingKey = delivery.getEnvelope().getRoutingKey();
@@ -89,6 +91,7 @@ public class Antenna {
             }
         };
 
+        // Rules 1, 2, and 4: Handling control messages
         DeliverCallback controlCallback = (consumerTag, delivery) -> {
             String message = new String(delivery.getBody(), "UTF-8");
             String routingKey = delivery.getEnvelope().getRoutingKey();
@@ -105,6 +108,7 @@ public class Antenna {
 
             System.out.println(" [CTRL] Received on " + antennaId + ": " + routingKey + " -> " + message);
 
+        // Rule 1: Receiving a search request
             if (type.equals("FIND")) {
                 System.out.println(" [ASK] Processing FIND for user " + dest + " from " + origin);
                 if (userLocations.containsKey(dest) && userLocations.get(dest).equals(antennaId)) {
@@ -117,6 +121,8 @@ public class Antenna {
                         System.err.println(" [!] Error broadcasting FIND: " + e.getMessage());
                     }
                 }
+
+            // Rule 2: Receiving a FOUND response
             } else if (type.equals("FOUND")) {
                 System.out.println(" [ACK] Processing FOUND from " + messageParts[1] + " for " + dest);
                 String foundAntenna = messageParts[1];
@@ -127,6 +133,8 @@ public class Antenna {
                     channel.basicPublish(CONTROL_EXCHANGE, origin + ".FOUND", null, message.getBytes("UTF-8"));
                     System.out.println(" [x] Relayed FOUND to " + origin);
                 }
+
+            // Rule 4: Handling mobility
             } else if (type.equals("MOVE")) {
                 String user = messageParts[0];
                 String newAntennaId = messageParts[1];
@@ -138,27 +146,14 @@ public class Antenna {
                     userLocations.put(user, antennaId);
                     System.out.println(" [MOVE] User " + user + " connected to " + antennaId);
                 }
-            } else if (type.equals("DETECT")) {
-                String user = messageParts[0];
-                String detectingAntenna = messageParts[1];
-                if (userLocations.containsKey(user) && antennaId.compareTo(detectingAntenna) < 0) {
-                    channel.basicPublish(CONTROL_EXCHANGE, "*.CLAIM", null, (user + ";" + antennaId).getBytes("UTF-8"));
-                    System.out.println(" [x] Claimed " + user + " over " + detectingAntenna);
-                }
-            } else if (type.equals("CLAIM")) {
-                String user = messageParts[0];
-                String claimingAntenna = messageParts[1];
-                if (!antennaId.equals(claimingAntenna) && userLocations.containsKey(user)) {
-                    userLocations.remove(user);
-                    System.out.println(" [x] User " + user + " claimed by " + claimingAntenna);
-                }
-            }
+            } 
         };
 
         channel.basicConsume(smsQueue, true, smsCallback, consumerTag -> {});
         channel.basicConsume(controlQueue, true, controlCallback, consumerTag -> {});
     }
 
+   // Utility function for broadcasting to neighbors
     private void broadcastToNeighbors(String type, String action, String message, String dest, String origin) throws Exception {
         int myIndex = Arrays.asList(ANTENNA_IDS).indexOf(antennaId);
         for (int i = 0; i < ANTENNA_IDS.length; i++) {
@@ -171,6 +166,7 @@ public class Antenna {
         }
     }
 
+     // Utility function for broadcasting to neighbors except the origin
     private void broadcastToNeighborsExcept(String type, String action, String message, String dest, String origin) throws Exception {
         int myIndex = Arrays.asList(ANTENNA_IDS).indexOf(antennaId);
         for (int i = 0; i < ANTENNA_IDS.length; i++) {
@@ -182,6 +178,7 @@ public class Antenna {
         }
     }
 
+        // Utility function for assigning a user to an antenna
     public static String assignUser(double userX, double userY, String userId) {
         String closestAntenna = null;
         double minDistance = Double.MAX_VALUE;

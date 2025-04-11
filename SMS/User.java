@@ -8,7 +8,7 @@ public class User {
     private static final String SMS_EXCHANGE = "sms_exchange"; 
     private static final String CONTROL_EXCHANGE = "control_exchange"; 
     private String userId;
-    private double x, y; 
+    private double x, y; // User's coordinates
     private String currentAntenna; 
     private Channel channel;
     private String userQueue;
@@ -37,9 +37,10 @@ public class User {
         }
 
         startMessageListener(); 
-        runConsole(); 
+        runConsole(); // User interface to interact with the system
     }
 
+    // Receiving messages
     private void startMessageListener() throws Exception {
         DeliverCallback deliverCallback = (consumerTag, delivery) -> {
             String message = new String(delivery.getBody(), "UTF-8");
@@ -54,8 +55,7 @@ public class User {
             System.out.println("\n=== User " + userId + " at (" + x + "," + y + ") on " + currentAntenna + " ===");
             System.out.println("1. Send a message");
             System.out.println("2. Move to new coordinates");
-            System.out.println("3. Simulate random movement");
-            System.out.println("4. Exit");
+            System.out.println("3. Exit");
             System.out.print("Choose an option: ");
             String choice = scanner.nextLine();
 

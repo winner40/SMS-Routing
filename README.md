@@ -82,3 +82,4 @@ make clean
 
 - Girncuti Dany Carol (dany-carol.girincuti@etu.univ-grenoble-alpes.fr)
 - Dagar Tiyo Vaneck Duramel (vaneck-duramel.dagar-tiyo@etu.univ-grenoble-alpes.fr)
+- Mert Ozkarsiyakali
