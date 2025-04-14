@@ -85,11 +85,11 @@ public class User {
             System.out.println(" [x] Cannot send message: No coverage");
             return;
         }
-        String fullMessage = "Hello " + targetUser + ", this is " + userId + ": " + message;
+        String fullMessage = message;
         channel.basicPublish(CONTROL_EXCHANGE, currentAntenna + ".FIND", null, (targetUser + ";" + currentAntenna + ";" + fullMessage).getBytes("UTF-8"));
-        System.out.println(" [x] Sent message to " + targetUser + " via " + currentAntenna);
+        System.out.println(" [x] Sent FIND request to locate " + targetUser + " via " + currentAntenna);
+        
     }
-
     private void move(double newX, double newY) throws Exception {
         String oldAntenna = currentAntenna;
         x = newX;

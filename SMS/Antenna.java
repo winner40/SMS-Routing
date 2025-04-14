@@ -65,33 +65,8 @@ public class Antenna {
     }
 
     private void startAntenna() throws Exception {
-
-        // Rule 3: Receiving and delivering an SMS
-        DeliverCallback smsCallback = (consumerTag, delivery) -> {
-            String message = new String(delivery.getBody(), "UTF-8");
-            String routingKey = delivery.getEnvelope().getRoutingKey();
-            String[] parts = routingKey.split("\\.");
-            String type = parts[1];
-            String dest = parts[2];
-
-            System.out.println(" [SMS] Received on " + antennaId + ": " + routingKey + " -> " + message);
-
-            if (type.equals("SEND_SMS")) {
-                if (userLocations.containsKey(dest) && userLocations.get(dest).equals(antennaId)) {
-                    // Case where sender and recipient are on the same antenna
-                    channel.basicPublish(SMS_EXCHANGE, dest + ".RECEIVE", null, message.getBytes("UTF-8"));
-                    System.out.println(" [x] Delivered directly to " + dest + ": " + message);
-                } else {
-                    try {
-                        broadcastToNeighbors("sms", "SEND_SMS", message, dest, antennaId);
-                    } catch (Exception e) {
-                        System.err.println(" [!] Error broadcasting SEND_SMS: " + e.getMessage());
-                    }
-                }
-            }
-        };
-
-        // Rules 1, 2, and 4: Handling control messages
+        
+        // Rules 1, 2, 3 and 4: Handling control messages
         DeliverCallback controlCallback = (consumerTag, delivery) -> {
             String message = new String(delivery.getBody(), "UTF-8");
             String routingKey = delivery.getEnvelope().getRoutingKey();
@@ -108,12 +83,19 @@ public class Antenna {
 
             System.out.println(" [CTRL] Received on " + antennaId + ": " + routingKey + " -> " + message);
 
-        // Rule 1: Receiving a search request
+        // Rule 1-3: Receiving a search request
             if (type.equals("FIND")) {
                 System.out.println(" [ASK] Processing FIND for user " + dest + " from " + origin);
                 if (userLocations.containsKey(dest) && userLocations.get(dest).equals(antennaId)) {
                     channel.basicPublish(CONTROL_EXCHANGE, origin + ".FOUND", null, (dest + ";" + antennaId + ";" + content).getBytes("UTF-8"));
                     System.out.println(" [ACK] Found " + dest + ", sent FOUND to " + origin);
+                    if (antennaId.equals(origin)) {
+                        String foundAntenna = messageParts[1];
+                        System.out.println(" [CTRL] Origin is the same as current antenna: " + antennaId);
+                        System.out.println(" [ACK] Processing FOUND from " + messageParts[1] + " for " + dest);
+                        channel.basicPublish(SMS_EXCHANGE, foundAntenna + ".SEND_SMS." + dest, null, content.getBytes("UTF-8"));
+                        System.out.println(" [x] SMS routed to " + foundAntenna + " for " + dest);
+                    }
                 } else {
                     try {
                         broadcastToNeighborsExcept("control", "FIND", message, dest, origin);
@@ -122,7 +104,7 @@ public class Antenna {
                     }
                 }
 
-            // Rule 2: Receiving a FOUND response
+            // Rule 2-3: Receiving a FOUND response
             } else if (type.equals("FOUND")) {
                 System.out.println(" [ACK] Processing FOUND from " + messageParts[1] + " for " + dest);
                 String foundAntenna = messageParts[1];
@@ -149,22 +131,9 @@ public class Antenna {
             } 
         };
 
-        channel.basicConsume(smsQueue, true, smsCallback, consumerTag -> {});
         channel.basicConsume(controlQueue, true, controlCallback, consumerTag -> {});
     }
 
-   // Utility function for broadcasting to neighbors
-    private void broadcastToNeighbors(String type, String action, String message, String dest, String origin) throws Exception {
-        int myIndex = Arrays.asList(ANTENNA_IDS).indexOf(antennaId);
-        for (int i = 0; i < ANTENNA_IDS.length; i++) {
-            if (ADJACENCY_MATRIX[myIndex][i] == 1) {
-                String neighbor = ANTENNA_IDS[i];
-                channel.basicPublish(type.equals("control") ? CONTROL_EXCHANGE : SMS_EXCHANGE,
-                        neighbor + "." + action, null, message.getBytes("UTF-8"));
-                System.out.println(" [x] Broadcast " + action + " to " + neighbor);
-            }
-        }
-    }
 
      // Utility function for broadcasting to neighbors except the origin
     private void broadcastToNeighborsExcept(String type, String action, String message, String dest, String origin) throws Exception {
@@ -197,7 +166,9 @@ public class Antenna {
         }
         return "No coverage";
     }
-
+    public static Map<String, String> getUserLocations() {
+        return userLocations;
+    }
     public static void main(String[] args) throws Exception {
         if (args.length < 1) {
             System.out.println("Usage: Antenna <antenna_id>");
